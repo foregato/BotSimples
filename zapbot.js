@@ -1,3 +1,13 @@
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
+
+const client = new Client({
+    authStrategy: new LocalAuth(), // Isso cria uma pasta 'remote-auth' e salva sua senha lá
+    puppeteer: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox'], // Necessário para rodar em servidores Linux
+    }
+});
+
 // leitor de qr code
 const qrcode = require('qrcode-terminal');
 const { Client, Buttons, List, MessageMedia } = require('whatsapp-web.js'); // Mudança Buttons
