@@ -1,7 +1,9 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const path = require('path');
 
-// Configuração com LocalAuth para não pedir QR Code toda vez
+// Configuração do Cliente
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -10,202 +12,163 @@ const client = new Client({
     }
 });
 
+const delay = ms => new Promise(res => setTimeout(res, ms));
+const atendimentoHumano = new Set();
+
+// --- FUNÇÃO PARA ENVIAR FOTOS DE UMA PASTA ---
+async function enviarFotosDaPasta(chatId, nomeDaPasta) {
+    const pastaPath = path.join(__dirname, 'fotos', nomeDaPasta);
+    
+    if (!fs.existsSync(pastaPath)) {
+        console.log(`Erro: Pasta ${nomeDaPasta} não encontrada.`);
+        return;
+    }
+
+    const arquivos = fs.readdirSync(pastaPath).filter(arquivo => 
+        arquivo.match(/\.(jpg|jpeg|png|gif)$/i)
+    );
+
+    const totalFotos = arquivos.length;
+
+    if (totalFotos === 0) {
+        await client.sendMessage(chatId, "No momento não temos fotos disponíveis para este local. 😕\n\n_Digite *0* para voltar ao menu._");
+        return;
+    }
+
+    await client.sendMessage(chatId, `📸 Preparando *${totalFotos}* foto${totalFotos > 1 ? 's' : ''} do local...\n\n_Aguarde um momento, por favor._`);
+    await delay(1000);
+
+    for (const arquivo of arquivos) {
+        try {
+            const media = MessageMedia.fromFilePath(path.join(pastaPath, arquivo));
+            await client.sendMessage(chatId, media);
+            await delay(1500); 
+        } catch (err) {
+            console.log(`Erro ao enviar ${arquivo}:`, err);
+        }
+    }
+    
+    await delay(800);
+    await client.sendMessage(chatId, 
+        `✅ Essas foram as fotos de *${nomeDaPasta}*!\n\n` +
+        `Gostou? Posso te ajudar com mais alguma coisa?\n\n` +
+        `_Digite *0* para voltar ao menu ou *6* para falar com atendente._`
+    );
+}
+
+// --- FUNÇÃO DO MENU PRINCIPAL ---
+async function enviarMenuPrincipal(chatId, firstName) {
+    await client.sendMessage(chatId, 
+        `📋 *MENU PRINCIPAL*\n\n` +
+        `Olá, ${firstName}! 👋\n\n` +
+        `Como posso ajudá-lo hoje? Escolha uma opção:\n\n` +
+        `*1* - 🏛️ Espaço Imperial\n` +
+        `*2* - 🎉 Dunlop Eventos\n` +
+        `*3* - 🌴 Chác. Palmeira Real\n` +
+        `*4* - 📅 Consultar Datas Disponíveis\n` +
+        `*5* - ❓ Outras Perguntas\n` +
+        `*6* - 👤 Falar com Atendente Humano\n\n` +
+        `_Digite o número da opção desejada._`
+    );
+}
+
+// --- EVENTOS DO CLIENTE ---
+
 client.on('qr', qr => {
     qrcode.generate(qr, {small: true});
-    console.log('Escaneie o QR Code acima para conectar:');
+    console.log('📱 Escaneie o QR Code acima para conectar:');
 });
 
 client.on('ready', () => {
-    console.log('Tudo certo! WhatsApp conectado e pronto para uso.');
+    console.log('✅ Tudo certo! WhatsApp conectado e pronto para uso.');
 });
 
-client.initialize();
-
-const delay = ms => new Promise(res => setTimeout(res, ms));
-
-// Armazena os contatos que solicitaram atendimento humano
-const atendimentoHumano = new Set();
-
 client.on('message', async msg => {
-    // Responde apenas conversas individuais
-    if (!msg.from.endsWith('@c.us')) return;
+    // CORREÇÃO: Ignora mensagens de Status para não postar o menu lá
+    if (msg.from === 'status@broadcast') return;
 
-    // Se o usuário já solicitou atendimento humano, o bot não responde mais
-    if (atendimentoHumano.has(msg.from)) {
+    // Comando para religar o bot manualmente
+    if (msg.body === '!voltar') {
+        atendimentoHumano.delete(msg.from);
+        await client.sendMessage(msg.from, `🤖 *Atendimento Automático Reativado*`);
         return;
     }
+
+    // Se estiver em atendimento humano, o bot não responde
+    if (atendimentoHumano.has(msg.from)) return;
 
     const chat = await msg.getChat();
     const name = msg._data.notifyName || "cliente";
     const firstName = name.split(" ")[0];
 
-    // Menu Principal
-    if (msg.body.match(/(menu|Menu|dia|tarde|noite|oi|Oi|Olá|olá|ola|Ola|inicio|Inicio|começar|Começar)/i)) {
-        await delay(1000);
+    // Gatilhos do Menu
+    if (msg.body.match(/(menu|dia|tarde|noite|oi|olá|ola|inicio|começar)/i)) {
         await chat.sendStateTyping();
-        await delay(1500);
-        
-        await client.sendMessage(msg.from, 
-            `Olá! ${firstName} 👋\n\n` +
-            `Sou o assistente virtual. Como posso ajudá-lo hoje?\n\n` +
-            `Digite uma opção:\n\n` +
-            `*1* - Espaço Imperial\n` +
-            `*2* - Dunlop Eventos\n` +
-            `*3* - Chác. Palmeira Real\n` +
-            `*4* - Datas Disponíveis\n` +
-            `*5* - Outras perguntas\n` +
-            `*6* - Falar com atendente humano\n\n` +
-            `_Digite *0* para voltar ao menu a qualquer momento_`
-        );
+        await delay(1000);
+        await enviarMenuPrincipal(msg.from, firstName);
         return;
     }
 
-    // Opção 0 - Voltar ao Menu
+    // Opção 0 - Menu
     if (msg.body === '0') {
-        await chat.sendStateTyping();
-        await delay(1000);
-        
-        await client.sendMessage(msg.from, 
-            `📋 *MENU PRINCIPAL*\n\n` +
-            `Digite uma opção:\n\n` +
-            `*1* - Espaço Imperial\n` +
-            `*2* - Dunlop Eventos\n` +
-            `*3* - Chác. Palmeira Real\n` +
-            `*4* - Datas Disponíveis\n` +
-            `*5* - Outras perguntas\n` +
-            `*6* - Falar com atendente humano`
-        );
+        await enviarMenuPrincipal(msg.from, firstName);
         return;
     }
 
-    // Opção 1 - Espaço Imperial
+    // Opção 1 - Imperial
     if (msg.body === '1') {
-        await chat.sendStateTyping();
-        await delay(1500);
-        
         await client.sendMessage(msg.from, 
             `🏛️ *ESPAÇO IMPERIAL*\n\n` +
-            `📍 *Localização:*\n` +
-            `Rua Natale Geraldo 290\n` +
-            `Jardim Uruguai\n\n` +
-            `💰 *Valores:*\n` +
-            `• Segunda a Quinta: R$ 300,00\n` +
-            `• Sexta-feira: R$ 350,00\n` +
-            `• Sábado/Domingo: R$ 550,00\n` +
-            `  _(Horário: 9h às 21h)_\n\n` +
-            `_Digite *0* para voltar ao menu_\n` +
-            `_Digite *6* para falar com atendente_`
+            `📍 *Localização:*\nRua Natale Geraldo, 290\nJardim Uruguai - Campinas/SP\n\n` +
+            `🗺️ *Google Maps:*\n https://maps.google.com/?q=-22.959072,-47.141411 \n\n\n\n` +
+            `💰 *Valores:*\n• Segunda a Quinta: R$ 300,00\n• Sexta-feira: R$ 350,00\n• Sábado e Domingo: R$ 550,00\n\n` +
+            `_Enviando fotos do local..._`
         );
+        await enviarFotosDaPasta(msg.from, 'Imperial');
         return;
     }
 
-    // Opção 2 - Dunlop Eventos
+    // Opção 2 - Dunlop
     if (msg.body === '2') {
-        await chat.sendStateTyping();
-        await delay(1500);
-        
         await client.sendMessage(msg.from, 
             `🎉 *DUNLOP EVENTOS*\n\n` +
-            `📍 *Localização:*\n` +
-            `Rua Dr Carlos Macia 388\n` +
-            `Satélite Iris 1\n\n` +
-            `💰 *Valores:*\n` +
-            `• Segunda a Quinta: R$ 350,00\n` +
-            `• Sexta-feira: R$ 400,00\n` +
-            `• Sábado/Domingo: R$ 600,00\n\n` +
-            `_Digite *0* para voltar ao menu_\n` +
-            `_Digite *6* para falar com atendente_`
+            `📍 *Localização:*\nRua Dr. Carlos Macia, 388\nSatélite Iris 1 - Campinas/SP\n\n` +
+            `🗺️ *Google Maps:*\n https://goo.gl/maps/FjAeUzzmXjTN45At9 \n\n\n\n` +
+            `💰 *Valores:*\n• Segunda a Quinta: R$ 350,00\n• Sexta-feira: R$ 400,00\n• Sábado e Domingo: R$ 600,00\n\n` +
+            `_Enviando fotos do local..._`
         );
+        await enviarFotosDaPasta(msg.from, 'Dunlop');
         return;
     }
 
-    // Opção 3 - Palmeira Real
+    // Opção 3 - Palmeira
     if (msg.body === '3') {
-        await chat.sendStateTyping();
-        await delay(1500);
-        
         await client.sendMessage(msg.from, 
             `🌴 *CHÁCARA PALMEIRA REAL*\n\n` +
-            `📍 *Localização:*\n` +
-            `Rua Dezesseis, 401\n` +
-            `Monte Mor\n\n` +
-            `💰 *Valores:*\n` +
-            `• Sábado OU Domingo: R$ 650,00\n` +
-            `• Dois dias (Sáb + Dom): R$ 1.200,00\n\n` +
-            `_Digite *0* para voltar ao menu_\n` +
-            `_Digite *6* para falar com atendente_`
+            `📍 *Localização:*\nRua Dezesseis, 401\nMonte Mor/SP\n\n` +
+            `🗺️ *Google Maps:*\n https://maps.app.goo.gl/xYQ3WxYJj1wmd4Sa7?g_st=com.google.maps.preview.copy \n\n\n\n` +
+            `💰 *Valores:*\n• Sábado OU Domingo: R$ 650,00\n• Sábado + Domingo: R$ 1.200,00\n\n` +
+            `_Enviando fotos do local..._`
         );
+        await enviarFotosDaPasta(msg.from, 'Palmeira');
         return;
     }
 
-    // Opção 4 - Datas Disponíveis
-    if (msg.body === '4') {
-        await chat.sendStateTyping();
-        await delay(1500);
-        
-        await client.sendMessage(msg.from, 
-            `📅 *CONSULTAR DISPONIBILIDADE*\n\n` +
-            `Para verificar datas disponíveis e fazer sua reserva, ` +
-            `você será direcionado para nossa atendente.\n\n` +
-            `Aguarde o retorno! Em breve entraremos em contato. 😊\n\n` +
-            `_Digite *0* para voltar ao menu_`
-        );
-        return;
-    }
-
-    // Opção 5 - Outras Perguntas
-    if (msg.body === '5') {
-        await chat.sendStateTyping();
-        await delay(1000);
-        
-        await client.sendMessage(msg.from, 
-            `❓ *OUTRAS PERGUNTAS*\n\n` +
-            `Fique à vontade para fazer sua pergunta!\n` +
-            `Vou fazer o possível para ajudá-lo. 😊\n\n` +
-            `Se preferir falar diretamente com nossa equipe, ` +
-            `digite *6* para atendimento humano.\n\n` +
-            `_Digite *0* para voltar ao menu_`
-        );
-        return;
-    }
-
-    // Opção 6 - Falar com Atendente Humano
-    if (msg.body === '6') {
-        await chat.sendStateTyping();
-        await delay(1500);
-        
-        // Adiciona o contato à lista de atendimento humano
+    // Opções 4, 5 e 6 - Atendimento Humano
+    if (msg.body === '4' || msg.body === '5' || msg.body === '6') {
         atendimentoHumano.add(msg.from);
-        
         await client.sendMessage(msg.from, 
-            `👤 *ATENDIMENTO HUMANO SOLICITADO*\n\n` +
-            `${firstName}, você será atendido(a) por um membro ` +
-            `da nossa equipe em breve.\n\n` +
-            `Aguarde, logo alguém estará com você! 😊\n\n` +
-            `_O atendimento automático foi encerrado para este chat._`
+            `⏳ *Aguarde um momento...*\n\n` +
+            `${firstName}, vou te conectar com nossa equipe agora mesmo para te ajudar.\n\n` +
+            `_O atendimento automático foi pausado. Digite !voltar quando terminar._`
         );
-        
-        console.log(`[${new Date().toLocaleString()}] Atendimento humano solicitado por: ${msg.from}`);
         return;
     }
 
-    // Mensagens não reconhecidas (apenas se não estiver em atendimento humano)
-    if (!msg.body.match(/^[0-6]$/)) {
-        await delay(800);
-        await client.sendMessage(msg.from, 
-            `Desculpe, não entendi sua mensagem. 😅\n\n` +
-            `Digite *0* para ver o menu principal\n` +
-            `ou *6* para falar com atendente.`
-        );
+    // Resposta para opções inválidas
+    if (!msg.body.match(/^[0-6]$/) && msg.body.length < 3) {
+        await client.sendMessage(msg.from, `Ops, não entendi. 😅\nDigite *0* para ver o menu.`);
     }
 });
 
-// Função para remover um contato da lista de atendimento humano (caso necessário)
-// Pode ser chamada manualmente ou através de algum comando administrativo
-function liberarAtendimentoAutomatico(numeroContato) {
-    atendimentoHumano.delete(numeroContato);
-    console.log(`[${new Date().toLocaleString()}] Atendimento automático liberado para: ${numeroContato}`);
-}
-
-// Exporta a função caso precise usar em outro módulo
-module.exports = { liberarAtendimentoAutomatico };
+client.initialize();    
