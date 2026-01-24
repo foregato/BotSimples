@@ -1,0 +1,269 @@
+import React, { useState, useEffect } from 'react';
+import { Activity, Users, MessageSquare, MapPin, Calendar, DollarSign, Image, Phone, QrCode, Wifi, WifiOff } from 'lucide-react';
+
+export default function WhatsAppBotDashboard() {
+  const [isConnected, setIsConnected] = useState(false);
+  const [qrCode, setQrCode] = useState(null);
+  const [stats, setStats] = useState({
+    totalMessages: 0,
+    activeChats: 0,
+    humanService: 0,
+    photosShared: 0
+  });
+  const [recentMessages, setRecentMessages] = useState([]);
+
+  // Simula conexão do bot
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsConnected(true);
+      setQrCode(null);
+    }, 3000);
+    
+    setQrCode("████████████████████████\n██ ▄▄▄▄▄ █▀█ █▄▄▄▄▄ ██\n██ █   █ █▀▀█ █   █ ██\n██ █▄▄▄█ ██▀█ █▄▄▄█ ██\n██▄▄▄▄▄▄▄█ ▀ █▄▄▄▄▄▄▄██\n████ ▄▄▀▄▀▀██▀▄▀▄█▀████\n██▀▀▀ ▀▄██▀▄▀▄▀▀███▀▀██\n████████████████████████");
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Simula atualizações de estatísticas
+  useEffect(() => {
+    if (!isConnected) return;
+    
+    const interval = setInterval(() => {
+      setStats(prev => ({
+        totalMessages: prev.totalMessages + Math.floor(Math.random() * 3),
+        activeChats: Math.floor(Math.random() * 15) + 5,
+        humanService: Math.floor(Math.random() * 5),
+        photosShared: prev.photosShared + Math.floor(Math.random() * 2)
+      }));
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
+  // Dados dos espaços
+  const espacos = [
+    {
+      id: 1,
+      nome: "Espaço Imperial",
+      icon: "🏛️",
+      endereco: "Rua Natale Geraldo, 290 - Jardim Uruguai, Campinas/SP",
+      precos: {
+        semana: "R$ 300,00",
+        sexta: "R$ 350,00",
+        fds: "R$ 550,00"
+      },
+      fotos: 12
+    },
+    {
+      id: 2,
+      nome: "Dunlop Eventos",
+      icon: "🎉",
+      endereco: "Rua Dr. Carlos Macia, 388 - Satélite Iris 1, Campinas/SP",
+      precos: {
+        semana: "R$ 350,00",
+        sexta: "R$ 400,00",
+        fds: "R$ 600,00"
+      },
+      fotos: 15
+    },
+    {
+      id: 3,
+      nome: "Chácara Palmeira Real",
+      icon: "🌴",
+      endereco: "Rua Dezesseis, 401 - Monte Mor/SP",
+      precos: {
+        sabOuDom: "R$ 650,00",
+        fimDeSemana: "R$ 1.200,00"
+      },
+      fotos: 18
+    }
+  ];
+
+  const menuOptions = [
+    { num: "1", label: "Espaço Imperial", icon: "🏛️" },
+    { num: "2", label: "Dunlop Eventos", icon: "🎉" },
+    { num: "3", label: "Chác. Palmeira Real", icon: "🌴" },
+    { num: "4", label: "Consultar Datas", icon: "📅" },
+    { num: "5", label: "Outras Perguntas", icon: "❓" },
+    { num: "6", label: "Atendente Humano", icon: "👤" }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
+                <MessageSquare className="text-green-600" size={36} />
+                Dashboard - Bot de Locação
+              </h1>
+              <p className="text-gray-600 mt-2">Gerenciamento de atendimento WhatsApp</p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {isConnected ? (
+                <>
+                  <Wifi className="text-green-500" size={24} />
+                  <span className="px-4 py-2 bg-green-100 text-green-700 rounded-full font-semibold">
+                    ✅ Conectado
+                  </span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="text-orange-500" size={24} />
+                  <span className="px-4 py-2 bg-orange-100 text-orange-700 rounded-full font-semibold">
+                    ⏳ Conectando...
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* QR Code Section */}
+        {qrCode && !isConnected && (
+          <div className="bg-white rounded-lg shadow-lg p-8 mb-6 text-center">
+            <QrCode className="mx-auto text-green-600 mb-4" size={48} />
+            <h2 className="text-2xl font-bold mb-4">Escaneie o QR Code</h2>
+            <div className="bg-gray-100 p-6 rounded-lg inline-block">
+              <pre className="text-xs font-mono">{qrCode}</pre>
+            </div>
+            <p className="text-gray-600 mt-4">Abra o WhatsApp no celular e escaneie este código</p>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        {isConnected && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">Total Mensagens</p>
+                  <p className="text-3xl font-bold text-gray-800">{stats.totalMessages}</p>
+                </div>
+                <MessageSquare className="text-blue-500" size={40} />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">Chats Ativos</p>
+                  <p className="text-3xl font-bold text-gray-800">{stats.activeChats}</p>
+                </div>
+                <Users className="text-green-500" size={40} />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">Atend. Humano</p>
+                  <p className="text-3xl font-bold text-gray-800">{stats.humanService}</p>
+                </div>
+                <Phone className="text-orange-500" size={40} />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">Fotos Enviadas</p>
+                  <p className="text-3xl font-bold text-gray-800">{stats.photosShared}</p>
+                </div>
+                <Image className="text-purple-500" size={40} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isConnected && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Menu do Bot */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Activity className="text-green-600" />
+                Menu Principal do Bot
+              </h2>
+              
+              <div className="space-y-3">
+                {menuOptions.map(option => (
+                  <div key={option.num} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-green-50 transition-colors">
+                    <span className="text-2xl">{option.icon}</span>
+                    <div className="flex-1">
+                      <span className="font-semibold text-green-600">{option.num}</span>
+                      <span className="text-gray-700 ml-2">{option.label}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Informações dos Espaços */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <MapPin className="text-green-600" />
+                Espaços Cadastrados
+              </h2>
+              
+              <div className="space-y-4">
+                {espacos.map(espaco => (
+                  <div key={espaco.id} className="border border-gray-200 rounded-lg p-4 hover:border-green-300 transition-colors">
+                    <div className="flex items-start gap-3 mb-3">
+                      <span className="text-3xl">{espaco.icon}</span>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg text-gray-800">{espaco.nome}</h3>
+                        <p className="text-sm text-gray-600">{espaco.endereco}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      {Object.entries(espaco.precos).map(([dia, preco]) => (
+                        <div key={dia} className="bg-green-50 p-2 rounded">
+                          <p className="text-xs text-gray-600 capitalize">{dia.replace(/([A-Z])/g, ' $1')}</p>
+                          <p className="font-semibold text-green-700">{preco}</p>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Image size={16} />
+                      <span>{espaco.fotos} fotos disponíveis</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* Footer Info */}
+        {isConnected && (
+          <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold mb-4">Funcionalidades Ativas</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-sm">Envio automático de fotos por pasta</span>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm">Transferência para atendimento humano</span>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                <span className="text-sm">Respostas personalizadas por nome</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
